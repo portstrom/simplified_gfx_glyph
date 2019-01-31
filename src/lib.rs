@@ -105,6 +105,33 @@ impl<'font, R: gfx::Resources, F: gfx::Factory<R>> GlyphBrush<'font, R, F> {
         self.sections.push(section);
     }
 
+    pub fn draw_cached(&mut self, encoder: &mut gfx::Encoder<R, impl gfx::CommandBuffer<R>>) {
+        self.draw_cached_with_transform(IDENTITY_MATRIX4, encoder);
+    }
+
+    pub fn draw_cached_with_transform(
+        &mut self,
+        transform: [[f32; 4]; 4],
+        encoder: &mut gfx::Encoder<R, impl gfx::CommandBuffer<R>>,
+    ) {
+        if let Some(&mut DrawnGlyphBrush {
+            ref pso,
+            ref slice,
+            ref mut pipe_data,
+            ..
+        }) = self.draw_cache.as_mut()
+        {
+            pipe_data.transform = transform;
+            encoder.draw(slice, &pso.1, pipe_data);
+        }
+
+        #[cfg(feature = "performance_stats")]
+        {
+            self.perf.draw_finished();
+            self.perf.log_sluggishness();
+        }
+    }
+
     /// Draws all queued sections onto a render target, applying a position transform (e.g.
     /// a projection).
     /// See [`queue`](struct.GlyphBrush.html#method.queue).
@@ -114,17 +141,12 @@ impl<'font, R: gfx::Resources, F: gfx::Factory<R>> GlyphBrush<'font, R, F> {
     /// # Raw usage
     /// Can also be used with gfx raw render & depth views if necessary. The `Format` must also
     /// be provided. [See example.](struct.GlyphBrush.html#raw-usage-1)
-    pub fn draw_queued<C, CV, DV>(
+    pub fn draw_queued(
         &mut self,
-        encoder: &mut gfx::Encoder<R, C>,
-        target: &CV,
-        depth_target: &DV,
-    ) -> Result<(), String>
-    where
-        C: gfx::CommandBuffer<R>,
-        CV: RawAndFormat<Raw = RawRenderTargetView<R>>,
-        DV: RawAndFormat<Raw = RawDepthStencilView<R>>,
-    {
+        encoder: &mut gfx::Encoder<R, impl gfx::CommandBuffer<R>>,
+        target: &impl RawAndFormat<Raw = RawRenderTargetView<R>>,
+        depth_target: &impl RawAndFormat<Raw = RawDepthStencilView<R>>,
+    ) -> Result<(), String> {
         self.draw_queued_with_transform(IDENTITY_MATRIX4, encoder, target, depth_target)
     }
 
@@ -172,18 +194,13 @@ impl<'font, R: gfx::Resources, F: gfx::Factory<R>> GlyphBrush<'font, R, F> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn draw_queued_with_transform<C, CV, DV>(
+    pub fn draw_queued_with_transform(
         &mut self,
         transform: [[f32; 4]; 4],
-        encoder: &mut gfx::Encoder<R, C>,
-        target: &CV,
-        depth_target: &DV,
-    ) -> Result<(), String>
-    where
-        C: gfx::CommandBuffer<R>,
-        CV: RawAndFormat<Raw = RawRenderTargetView<R>>,
-        DV: RawAndFormat<Raw = RawDepthStencilView<R>>,
-    {
+        encoder: &mut gfx::Encoder<R, impl gfx::CommandBuffer<R>>,
+        target: &impl RawAndFormat<Raw = RawRenderTargetView<R>>,
+        depth_target: &impl RawAndFormat<Raw = RawDepthStencilView<R>>,
+    ) -> Result<(), String> {
         #[cfg(feature = "performance_stats")]
         self.perf.draw_start();
 
@@ -292,6 +309,7 @@ impl<'font, R: gfx::Resources, F: gfx::Factory<R>> GlyphBrush<'font, R, F> {
 
             verts
         };
+        self.sections.clear();
         #[cfg(feature = "performance_stats")]
         self.perf.vertex_generation_done();
 
@@ -344,26 +362,7 @@ impl<'font, R: gfx::Resources, F: gfx::Factory<R>> GlyphBrush<'font, R, F> {
         };
 
         self.draw_cache = Some(draw_cache);
-
-        if let Some(&mut DrawnGlyphBrush {
-            ref pso,
-            ref slice,
-            ref mut pipe_data,
-            ..
-        }) = self.draw_cache.as_mut()
-        {
-            pipe_data.transform = transform;
-            encoder.draw(slice, &pso.1, pipe_data);
-        }
-
-        self.sections.clear();
-
-        #[cfg(feature = "performance_stats")]
-        {
-            self.perf.draw_finished();
-            self.perf.log_sluggishness();
-        }
-
+        self.draw_cached_with_transform(transform, encoder);
         Ok(())
     }
 
