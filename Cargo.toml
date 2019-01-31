@@ -1,0 +1,31 @@
+[package]
+authors = [
+    "Alex Butler <alexheretic@gmail.com>",
+    "Fredrik Portström <https://portstrom.com>"
+]
+description = "Fast GPU cached text rendering using gfx-rs & rusttype"
+edition = "2018"
+exclude = ["examples/**"]
+keywords = ["font", "ttf", "truetype", "gfx", "text"]
+license = "Apache-2.0"
+name = "gfx_glyph"
+readme = "README.md"
+repository = "https://github.com/portstrom/gfx_glyph"
+version = "0.12.2"
+
+[dependencies]
+log = "0.4"
+gfx = "0.17"
+gfx_core = "0.8"
+rusttype = { features = ["gpu_cache"], version = "0.7" }
+
+[dev-dependencies]
+gfx_window_glutin = "0.28"
+glutin = "0.19"
+html5ever = "0.22"
+mio = "0.6"
+
+[features]
+# Compiles in additional performance stats gathering and info-logging
+# each draw (when slower than 1ms)
+performance_stats = []
